@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "812642535197",
+    "project_id": "stargram-9f570",
+    "storage_bucket": "stargram-9f570.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812642535197:android:de7399cdc338f349fb03f4",
+        "android_client_info": {
+          "package_name": "com.stargram.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0Ar4wws1zaHxev51S9gCFrUdM0vieviY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
