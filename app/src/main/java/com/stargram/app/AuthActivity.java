@@ -8,34 +8,42 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 import android.widget.*;
 import android.text.InputFilter;
 
 public class AuthActivity extends Activity {
 
-    LinearLayout root;
-    TextView country;
-    TextView prefix;
-    EditText numberInput;
-    String selectedCode = "+7";
-
     int blue = Color.rgb(51, 144, 236);
     int black = Color.rgb(34, 34, 34);
     int gray = Color.rgb(112, 117, 121);
 
-    GradientDrawable shape(int color, int radius) {
+    String selectedCode = "+7";
+
+    TextView country;
+    TextView prefix;
+    EditText numberInput;
+
+    GradientDrawable background(int color, int radius) {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(color);
         bg.setCornerRadius(radius);
         return bg;
     }
 
-    TextView makeText(String value, int size, int color) {
+    TextView text(String value, int size, int color) {
         TextView t = new TextView(this);
         t.setText(value);
         t.setTextSize(size);
         t.setTextColor(color);
         return t;
+    }
+
+    View line() {
+        View v = new View(this);
+        v.setBackgroundColor(Color.rgb(218, 221, 225));
+        return v;
     }
 
     @Override
@@ -48,74 +56,118 @@ public class AuthActivity extends Activity {
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         );
 
-        showPhoneScreen();
+        showScreen();
     }
 
-    void showPhoneScreen() {
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
-        root.setPadding(28, 65, 28, 20);
+    void showScreen() {
 
-        TextView title = makeText("Номер телефона", 24, black);
+        FrameLayout screen = new FrameLayout(this);
+        screen.setBackgroundColor(Color.WHITE);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        content.setPadding(dp(28), dp(20), dp(28), dp(20));
+
+        FrameLayout.LayoutParams contentParams =
+            new FrameLayout.LayoutParams(
+                -1, -2, Gravity.CENTER
+            );
+
+        screen.addView(content, contentParams);
+
+        // Заголовок
+
+        TextView title = text(
+            "Номер телефона", 25, black
+        );
+
+        title.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         title.setGravity(Gravity.CENTER);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(title);
 
-        TextView subtitle = makeText(
+        content.addView(title,
+            new LinearLayout.LayoutParams(-1, -2));
+
+        // Описание
+
+        TextView subtitle = text(
             "Проверьте код страны и введите номер телефона",
             14, gray
         );
+
         subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subParams =
+
+        LinearLayout.LayoutParams subtitleParams =
             new LinearLayout.LayoutParams(-1, -2);
-        subParams.setMargins(0, 12, 0, 38);
-        root.addView(subtitle, subParams);
 
-        country = makeText("Казахстан                         +7     ▾", 16, blue);
-        country.setGravity(Gravity.CENTER_VERTICAL);
-        country.setPadding(4, 0, 4, 0);
+        subtitleParams.setMargins(0, dp(12), 0, dp(38));
 
-        View countryLine = new View(this);
-        countryLine.setBackgroundColor(Color.rgb(218, 221, 225));
+        content.addView(subtitle, subtitleParams);
 
-        root.addView(country, new LinearLayout.LayoutParams(-1, 48));
-        root.addView(countryLine, new LinearLayout.LayoutParams(-1, 1));
+        // Выбор номера
 
-        country.setOnClickListener(v -> {
-            String[] choices = {
+        LinearLayout countryRow = new LinearLayout(this);
+        countryRow.setOrientation(LinearLayout.HORIZONTAL);
+        countryRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        country = text("Казахстан", 16, blue);
+
+        countryRow.addView(country,
+            new LinearLayout.LayoutParams(0, dp(52), 1));
+
+        TextView arrowDown = text("⌄", 23, blue);
+        arrowDown.setGravity(Gravity.CENTER);
+
+        countryRow.addView(arrowDown,
+            new LinearLayout.LayoutParams(dp(35), dp(52)));
+
+        content.addView(countryRow,
+            new LinearLayout.LayoutParams(-1, dp(52)));
+
+        content.addView(line(),
+            new LinearLayout.LayoutParams(-1, dp(1)));
+
+        countryRow.setOnClickListener(v -> {
+
+            String[] options = {
                 "Казахстан (+7)",
-                "STARGRAM Custom (+888)"
+                "Пользовательский номер (+888)"
             };
 
             new AlertDialog.Builder(this)
-                .setTitle("Выберите номер")
-                .setItems(choices, (dialog, which) -> {
+                .setTitle("Выберите тип номера")
+                .setItems(options, (dialog, which) -> {
+
                     if (which == 0) {
                         selectedCode = "+7";
-                        country.setText("Казахстан                         +7     ▾");
+                        country.setText("Казахстан");
                     } else {
                         selectedCode = "+888";
-                        country.setText("Пользовательский (+888)       ▾");
+                        country.setText("Пользовательский номер");
                     }
 
                     prefix.setText(selectedCode);
                     numberInput.setText("");
+
+                    int limit = selectedCode.equals("+7") ? 10 : 8;
+
                     numberInput.setFilters(new InputFilter[] {
-                        new InputFilter.LengthFilter(
-                            selectedCode.equals("+7") ? 10 : 8
-                        )
+                        new InputFilter.LengthFilter(limit)
                     });
                 })
                 .show();
         });
 
+        // Поле номера
+
         LinearLayout phoneRow = new LinearLayout(this);
         phoneRow.setOrientation(LinearLayout.HORIZONTAL);
         phoneRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        prefix = makeText("+7", 18, black);
-        phoneRow.addView(prefix);
+        prefix = text("+7", 18, black);
+
+        phoneRow.addView(prefix,
+            new LinearLayout.LayoutParams(-2, dp(55)));
 
         numberInput = new EditText(this);
         numberInput.setSingleLine(true);
@@ -125,50 +177,67 @@ public class AuthActivity extends Activity {
         numberInput.setHintTextColor(Color.rgb(150, 150, 150));
         numberInput.setInputType(2);
         numberInput.setBackgroundColor(Color.TRANSPARENT);
-        numberInput.setPadding(12, 0, 0, 0);
+        numberInput.setPadding(dp(12), 0, 0, 0);
+
         numberInput.setFilters(new InputFilter[] {
             new InputFilter.LengthFilter(10)
         });
 
         phoneRow.addView(numberInput,
-            new LinearLayout.LayoutParams(0, 58, 1));
+            new LinearLayout.LayoutParams(0, dp(55), 1));
 
-        TextView next = makeText("➜", 23, Color.WHITE);
+        // Круглая кнопка
+
+        TextView next = text("➜", 23, Color.WHITE);
         next.setGravity(Gravity.CENTER);
-        next.setBackground(shape(blue, 100));
+        next.setBackground(background(blue, dp(50)));
 
-        LinearLayout.LayoutParams arrowParams =
-            new LinearLayout.LayoutParams(48, 48);
-        arrowParams.setMargins(8, 0, 0, 0);
-        phoneRow.addView(next, arrowParams);
+        LinearLayout.LayoutParams nextParams =
+            new LinearLayout.LayoutParams(dp(48), dp(48));
 
-        root.addView(phoneRow,
-            new LinearLayout.LayoutParams(-1, 58));
+        nextParams.setMargins(dp(8), 0, 0, 0);
 
-        View phoneLine = new View(this);
-        phoneLine.setBackgroundColor(Color.rgb(218, 221, 225));
-        root.addView(phoneLine,
-            new LinearLayout.LayoutParams(-1, 1));
+        phoneRow.addView(next, nextParams);
+
+        LinearLayout.LayoutParams phoneParams =
+            new LinearLayout.LayoutParams(-1, dp(58));
+
+        phoneParams.setMargins(0, dp(4), 0, 0);
+
+        content.addView(phoneRow, phoneParams);
+
+        content.addView(line(),
+            new LinearLayout.LayoutParams(-1, dp(1)));
+
+        // Продолжение
 
         next.setOnClickListener(v -> {
+
             String number = numberInput.getText().toString();
 
             int required = selectedCode.equals("+7") ? 10 : 8;
 
             if (number.length() != required) {
                 Toast.makeText(this,
-                    "Проверьте номер телефона",
+                    "Проверьте введённый номер",
                     Toast.LENGTH_SHORT).show();
                 return;
             }
 
             new AlertDialog.Builder(this)
-                .setTitle("Продолжить")
-                .setMessage("Подключение подтверждения номера будет следующим этапом.")
-                .setPositiveButton("ОК", null)
+                .setTitle("Подтверждение")
+                .setMessage(
+                    "Подключение системы подтверждения будет следующим этапом."
+                )
+                .setPositiveButton("Понятно", null)
                 .show();
         });
 
-        setContentView(root);
+        setContentView(screen);
+    }
+
+    int dp(int value) {
+        return (int) (value * getResources()
+            .getDisplayMetrics().density + 0.5f);
     }
 }
