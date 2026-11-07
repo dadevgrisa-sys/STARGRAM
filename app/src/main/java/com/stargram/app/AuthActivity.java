@@ -15,7 +15,7 @@ public class AuthActivity extends Activity {
     LinearLayout root;
     EditText numberInput;
     TextView country;
-    String selectedCode = "+7"; prefix.setText(selectedCode);
+    String selectedCode = "+7";
 
     int blue = Color.rgb(51, 144, 236);
 
