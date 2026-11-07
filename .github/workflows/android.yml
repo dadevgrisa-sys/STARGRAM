@@ -1,4 +1,4 @@
-ame: Build STARGRAM APK
+name: Build STARGRAM APK
 
 on:
   workflow_dispatch:
