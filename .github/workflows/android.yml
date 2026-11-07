@@ -1,4 +1,4 @@
-name: Build STARGRAM APK
+ame: Build STARGRAM APK
 
 on:
   workflow_dispatch:
@@ -24,6 +24,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: false
+          packages: platform-tools
 
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses
