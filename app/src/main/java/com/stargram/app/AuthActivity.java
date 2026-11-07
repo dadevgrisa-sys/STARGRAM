@@ -14,6 +14,7 @@ public class AuthActivity extends Activity {
 
     LinearLayout root;
     EditText numberInput;
+    TextView prefix;
     TextView country;
     String selectedCode = "+7";
 
@@ -94,7 +95,7 @@ public class AuthActivity extends Activity {
         phoneBox.setPadding(15, 0, 10, 0);
         phoneBox.setBackgroundColor(Color.rgb(247, 249, 252));
 
-        TextView prefix = makeText("+7", 17, Color.BLACK);
+        prefix = makeText("+7", 17, Color.BLACK);
         phoneBox.addView(prefix);
 
         numberInput = new EditText(this);
