@@ -3,6 +3,7 @@ package com.stargram.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -11,155 +12,157 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
 import android.text.InputFilter;
+import android.text.InputType;
 
 public class AuthActivity extends Activity {
 
-    private final int blue = Color.rgb(51, 144, 236);
-    private final int black = Color.rgb(34, 34, 34);
-    private final int gray = Color.rgb(112, 117, 121);
+    private final int bg = Color.rgb(24, 24, 24);
+    private final int surface = Color.rgb(35, 35, 35);
+    private final int white = Color.WHITE;
+    private final int gray = Color.rgb(145, 145, 145);
+    private final int blue = Color.rgb(82, 115, 245);
+    private final int outline = Color.rgb(75, 75, 75);
 
     private String selectedCode = "+7";
     private TextView country;
     private TextView prefix;
     private EditText numberInput;
 
+    private CheckBox syncContacts;
+    private CheckBox testServer;
+    private CheckBox compatibility;
+
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private GradientDrawable border(int color, int stroke, int radius) {
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(color);
-        shape.setCornerRadius(dp(radius));
-        shape.setStroke(dp(stroke), Color.rgb(218, 221, 225));
-        return shape;
+    private GradientDrawable shape(int color, int strokeColor, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radius));
+        if (strokeColor != 0) {
+            drawable.setStroke(dp(1), strokeColor);
+        }
+        return drawable;
     }
 
     private TextView makeText(String value, int size, int color) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(size);
-        view.setTextColor(color);
-        return view;
+        TextView text = new TextView(this);
+        text.setText(value);
+        text.setTextSize(size);
+        text.setTextColor(color);
+        return text;
+    }
+
+    private CheckBox makeCheckBox(String text) {
+        CheckBox check = new CheckBox(this);
+        check.setText(text);
+        check.setTextSize(17);
+        check.setTextColor(white);
+        check.setButtonTintList(new ColorStateList(
+            new int[][] {
+                new int[] { android.R.attr.state_checked },
+                new int[] {}
+            },
+            new int[] { blue, Color.rgb(100, 100, 115) }
+        ));
+        check.setPadding(dp(2), 0, 0, 0);
+        return check;
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().setStatusBarColor(Color.WHITE);
-        getWindow().setNavigationBarColor(Color.WHITE);
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        getWindow().setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         );
 
         showScreen();
     }
 
     private void showScreen() {
-        FrameLayout screen = new FrameLayout(this);
-        screen.setBackgroundColor(Color.WHITE);
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(bg);
+        screen.setPadding(dp(20), dp(12), dp(20), dp(16));
 
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(24), dp(8), dp(24), dp(20));
+        // Верхняя панель
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
 
-        FrameLayout.LayoutParams contentParams =
-            new FrameLayout.LayoutParams(
-                -1, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL
-            );
-        contentParams.topMargin = dp(65);
-        screen.addView(content, contentParams);
+        TextView back = makeText("‹", 42, white);
+        back.setGravity(Gravity.CENTER);
+        toolbar.addView(back, new LinearLayout.LayoutParams(dp(45), dp(52)));
 
-        TextView logo = makeText("STARGRAM", 25, blue);
-        logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        logo.setGravity(Gravity.CENTER);
-        content.addView(logo, new LinearLayout.LayoutParams(-1, dp(42)));
+        View spacer = new View(this);
+        toolbar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
 
-        TextView title = makeText("Номер телефона", 24, black);
-        title.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams titleParams =
-            new LinearLayout.LayoutParams(-1, -2);
-        titleParams.setMargins(0, dp(25), 0, dp(12));
-        content.addView(title, titleParams);
+        TextView menu = makeText("⋮", 30, white);
+        menu.setGravity(Gravity.CENTER);
+        toolbar.addView(menu, new LinearLayout.LayoutParams(dp(35), dp(52)));
 
-        TextView subtitle = makeText(
-            "Выберите страну и введите номер телефона", 14, gray
-        );
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subtitleParams =
-            new LinearLayout.LayoutParams(-1, -2);
-        subtitleParams.setMargins(0, 0, 0, dp(30));
-        content.addView(subtitle, subtitleParams);
+        screen.addView(toolbar);
 
-        country = makeText("Россия", 16, black);
-        country.setGravity(Gravity.CENTER_VERTICAL);
+        back.setOnClickListener(v -> finish());
 
-        TextView arrow = makeText("⌄", 22, blue);
-        arrow.setGravity(Gravity.CENTER);
-
-        LinearLayout countryBox = new LinearLayout(this);
-        countryBox.setOrientation(LinearLayout.HORIZONTAL);
-        countryBox.setGravity(Gravity.CENTER_VERTICAL);
-        countryBox.setPadding(dp(14), 0, dp(12), 0);
-        countryBox.setBackground(border(Color.WHITE, 1, 9));
-        countryBox.addView(country, new LinearLayout.LayoutParams(0, dp(54), 1));
-        countryBox.addView(arrow, new LinearLayout.LayoutParams(dp(30), dp(54)));
-
-        LinearLayout.LayoutParams countryParams =
-            new LinearLayout.LayoutParams(-1, dp(54));
-        countryParams.setMargins(0, 0, 0, dp(22));
-        content.addView(countryBox, countryParams);
-
-        TextView phoneLabel = makeText("Номер телефона", 14, gray);
-        LinearLayout.LayoutParams labelParams =
-            new LinearLayout.LayoutParams(-1, -2);
-        labelParams.setMargins(dp(2), 0, 0, dp(8));
-        content.addView(phoneLabel, labelParams);
-
-        LinearLayout phoneRow = new LinearLayout(this);
-        phoneRow.setOrientation(LinearLayout.HORIZONTAL);
-        phoneRow.setGravity(Gravity.CENTER_VERTICAL);
-        phoneRow.setPadding(dp(8), dp(5), dp(10), dp(5));
-        phoneRow.setBackground(border(Color.WHITE, 1, 9));
-
-        prefix = makeText("+7", 18, black);
-        prefix.setGravity(Gravity.CENTER);
-        prefix.setBackground(border(Color.WHITE, 1, 7));
-
-        phoneRow.addView(prefix,
-            new LinearLayout.LayoutParams(dp(58), dp(44)));
-
-        numberInput = new EditText(this);
-        numberInput.setSingleLine(true);
-        numberInput.setTextSize(18);
-        numberInput.setTextColor(black);
-        numberInput.setHint("000 000 0000");
-        numberInput.setHintTextColor(Color.rgb(150, 150, 150));
-        numberInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        numberInput.setBackgroundColor(Color.TRANSPARENT);
-        numberInput.setPadding(dp(12), 0, 0, 0);
-        numberInput.setFilters(new InputFilter[] {
-            new InputFilter.LengthFilter(10)
+        menu.setOnClickListener(v -> {
+            PopupMenu popup = new PopupMenu(this, menu);
+            popup.getMenu().add("О STARGRAM");
+            popup.getMenu().add("Помощь");
+            popup.setOnMenuItemClickListener(item -> {
+                new AlertDialog.Builder(this)
+                    .setTitle("STARGRAM")
+                    .setMessage("Мессенджер STARGRAM")
+                    .setPositiveButton("OK", null)
+                    .show();
+                return true;
+            });
+            popup.show();
         });
 
-        phoneRow.addView(numberInput,
-            new LinearLayout.LayoutParams(0, dp(54), 1));
+        // Основная часть
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(35), dp(18), 0);
 
-        LinearLayout.LayoutParams phoneParams =
-            new LinearLayout.LayoutParams(-1, dp(64));
-        content.addView(phoneRow, phoneParams);
+        TextView title = makeText("Номер телефона", 22, white);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
 
-        TextView next = makeText("➜", 23, Color.WHITE);
-        next.setGravity(Gravity.CENTER);
-        next.setBackground(border(blue, 0, 50));
+        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        LinearLayout.LayoutParams nextParams =
-            new LinearLayout.LayoutParams(dp(52), dp(52));
-        nextParams.gravity = Gravity.RIGHT;
-        nextParams.setMargins(0, dp(25), 0, 0);
-        content.addView(next, nextParams);
+        TextView subtitle = makeText(
+            "Проверьте код страны и введите свой\nномер телефона.", 16, gray
+        );
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setLineSpacing(dp(3), 1f);
+
+        LinearLayout.LayoutParams subtitleParams =
+            new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.setMargins(0, dp(18), 0, dp(48));
+        content.addView(subtitle, subtitleParams);
+
+        // Выбор страны
+        LinearLayout countryBox = new LinearLayout(this);
+        countryBox.setGravity(Gravity.CENTER_VERTICAL);
+        countryBox.setPadding(dp(16), 0, dp(14), 0);
+        countryBox.setBackground(shape(bg, outline, 10));
+
+        country = makeText("Страна", 17, gray);
+        countryBox.addView(country,
+            new LinearLayout.LayoutParams(0, dp(58), 1));
+
+        TextView countryArrow = makeText("›", 32, gray);
+        countryArrow.setGravity(Gravity.CENTER);
+        countryBox.addView(countryArrow,
+            new LinearLayout.LayoutParams(dp(30), dp(58)));
+
+        content.addView(countryBox,
+            new LinearLayout.LayoutParams(-1, dp(60)));
 
         countryBox.setOnClickListener(v -> {
             String[] options = {
@@ -168,7 +171,7 @@ public class AuthActivity extends Activity {
             };
 
             new AlertDialog.Builder(this)
-                .setTitle("Выберите страну или тип номера")
+                .setTitle("Страна")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
                         selectedCode = "+7";
@@ -178,13 +181,15 @@ public class AuthActivity extends Activity {
                         country.setText("Пользовательский номер");
                     }
 
+                    country.setTextColor(white);
                     prefix.setText(selectedCode);
                     numberInput.setText("");
+
+                    int required = selectedCode.equals("+7") ? 10 : 8;
                     numberInput.setFilters(new InputFilter[] {
-                        new InputFilter.LengthFilter(
-                            selectedCode.equals("+7") ? 10 : 8
-                        )
+                        new InputFilter.LengthFilter(required)
                     });
+
                     numberInput.setHint(
                         selectedCode.equals("+7") ? "000 000 0000" : "0000 0000"
                     );
@@ -192,7 +197,106 @@ public class AuthActivity extends Activity {
                 .show();
         });
 
-        next.setOnClickListener(v -> {
+        // Поле номера
+        FrameLayout phoneField = new FrameLayout(this);
+        phoneField.setBackground(shape(bg, Color.rgb(135, 150, 255), 12));
+
+        LinearLayout phoneRow = new LinearLayout(this);
+        phoneRow.setGravity(Gravity.CENTER_VERTICAL);
+        phoneRow.setPadding(dp(16), dp(7), dp(12), dp(5));
+
+        prefix = makeText("+", 20, white);
+        prefix.setGravity(Gravity.CENTER);
+        phoneRow.addView(prefix,
+            new LinearLayout.LayoutParams(dp(48), -1));
+
+        View divider = new View(this);
+        divider.setBackgroundColor(outline);
+        phoneRow.addView(divider,
+            new LinearLayout.LayoutParams(dp(1), dp(30)));
+
+        numberInput = new EditText(this);
+        numberInput.setSingleLine(true);
+        numberInput.setTextSize(19);
+        numberInput.setTextColor(white);
+        numberInput.setHint(" ");
+        numberInput.setHintTextColor(gray);
+        numberInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        numberInput.setBackgroundColor(Color.TRANSPARENT);
+        numberInput.setPadding(dp(14), 0, 0, 0);
+        numberInput.setFilters(new InputFilter[] {
+            new InputFilter.LengthFilter(10)
+        });
+
+        phoneRow.addView(numberInput,
+            new LinearLayout.LayoutParams(0, -1, 1));
+
+        phoneField.addView(phoneRow,
+            new FrameLayout.LayoutParams(-1, -1));
+
+        TextView phoneLabel = makeText("Номер телефона", 12, Color.rgb(160, 170, 255));
+        phoneLabel.setBackgroundColor(bg);
+        phoneLabel.setPadding(dp(6), 0, dp(6), 0);
+
+        FrameLayout.LayoutParams labelParams =
+            new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
+        labelParams.leftMargin = dp(16);
+        labelParams.topMargin = -dp(9);
+        phoneField.addView(phoneLabel, labelParams);
+
+        LinearLayout.LayoutParams phoneParams =
+            new LinearLayout.LayoutParams(-1, dp(66));
+        phoneParams.setMargins(0, dp(40), 0, dp(24));
+        content.addView(phoneField, phoneParams);
+
+        // Переключатели
+        syncContacts = makeCheckBox("Синхронизировать контакты");
+        testServer = makeCheckBox("Тестовый сервер");
+        compatibility = makeCheckBox("Режим совместимости");
+
+        content.addView(syncContacts,
+            new LinearLayout.LayoutParams(-1, dp(56)));
+
+        content.addView(testServer,
+            new LinearLayout.LayoutParams(-1, dp(56)));
+
+        LinearLayout compatibilityRow = new LinearLayout(this);
+        compatibilityRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        compatibilityRow.addView(compatibility,
+            new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        TextView question = makeText("ⓘ", 21, gray);
+        question.setGravity(Gravity.CENTER);
+        compatibilityRow.addView(question,
+            new LinearLayout.LayoutParams(dp(35), dp(50)));
+
+        question.setOnClickListener(v ->
+            new AlertDialog.Builder(this)
+                .setTitle("Режим совместимости")
+                .setMessage("Дополнительный режим совместимости приложения.")
+                .setPositiveButton("Понятно", null)
+                .show()
+        );
+
+        content.addView(compatibilityRow);
+
+        // Кнопка продолжения
+        FrameLayout button = new FrameLayout(this);
+        button.setBackground(shape(blue, 0, 17));
+
+        TextView arrow = makeText("→", 32, white);
+        arrow.setGravity(Gravity.CENTER);
+        button.addView(arrow,
+            new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout.LayoutParams buttonParams =
+            new LinearLayout.LayoutParams(dp(68), dp(68));
+        buttonParams.gravity = Gravity.RIGHT;
+        buttonParams.setMargins(0, dp(10), 0, 0);
+        content.addView(button, buttonParams);
+
+        button.setOnClickListener(v -> {
             String number = numberInput.getText().toString();
 
             if (number.equals("20261107")) {
@@ -202,6 +306,7 @@ public class AuthActivity extends Activity {
             }
 
             int required = selectedCode.equals("+7") ? 10 : 8;
+
             if (number.length() != required) {
                 Toast.makeText(
                     this, "Проверьте введённый номер", Toast.LENGTH_SHORT
@@ -215,6 +320,14 @@ public class AuthActivity extends Activity {
                 .setPositiveButton("Понятно", null)
                 .show();
         });
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(bg);
+        scroll.addView(content);
+
+        screen.addView(scroll,
+            new LinearLayout.LayoutParams(-1, 0, 1));
 
         setContentView(screen);
     }
