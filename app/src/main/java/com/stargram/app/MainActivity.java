@@ -121,30 +121,21 @@ public class MainActivity extends Activity {
 
     void chatHeader() {
         LinearLayout h = row();
-        h.setPadding(dp(16),dp(12),dp(16),dp(8));
+        h.setPadding(dp(18),dp(13),dp(18),dp(13));
 
-        TextView menu = text("☰",26,blue);
-        h.addView(menu);
-        menu.setOnClickListener(v -> showPage("Меню"));
+        TextView logo = text("✦",32,blue);
+        logo.setTypeface(null,Typeface.BOLD);
+        h.addView(logo);
 
-        TextView title = text("  STARGRAM",23,blue);
+        TextView title = text("  Stargram",25,fg);
         title.setTypeface(null,Typeface.BOLD);
         h.addView(title,new LinearLayout.LayoutParams(0,-2,1));
 
-        TextView search = text("⌕",30,fg);
-        h.addView(search);
-        search.setOnClickListener(v -> {
-            EditText e = new EditText(this);
-            e.setSingleLine(true);
-            e.setHint("Поиск чатов");
-            content.addView(e,0);
-            e.requestFocus();
-        });
+        TextView menu = text("⋮",30,fg);
+        h.addView(menu);
+        menu.setOnClickListener(v -> showPage("Меню"));
 
         root.addView(h);
-        View divider = new View(this);
-        divider.setBackgroundColor(line);
-        root.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
     }
 
     void heading(String s) {
@@ -157,81 +148,103 @@ public class MainActivity extends Activity {
     void chats() {
         EditText search = new EditText(this);
         search.setSingleLine(true);
-        search.setTextSize(15);
-        search.setHint("Поиск");
-        search.setPadding(dp(15),0,dp(15),0);
-        search.setBackground(shape(dark ? card : Color.rgb(242,244,246),24));
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1,dp(44));
-        sp.setMargins(dp(14),dp(12),dp(14),dp(8));
+        search.setTextSize(16);
+        search.setHint("⌕   Поиск чатов");
+        search.setPadding(dp(18),0,dp(18),0);
+        search.setTextColor(fg);
+        search.setHintTextColor(muted);
+        search.setBackground(shape(card,30));
+
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1,dp(50));
+        sp.setMargins(dp(16),dp(10),dp(16),dp(12));
         content.addView(search,sp);
 
-        heading("Истории");
+        LinearLayout banner = row();
+        banner.setPadding(dp(15),dp(13),dp(12),dp(13));
+        banner.setBackground(shape(card,25));
 
-        HorizontalScrollView hs = new HorizontalScrollView(this);
-        LinearLayout stories = row();
-        stories.setPadding(dp(10),dp(5),dp(10),dp(12));
-        String[] storyNames = {"Ваша история","Александр","Маша","Новости","Игры"};
-        String[] storyIcons = {"+","А","М","Н","🎮"};
+        LinearLayout bannerText = column();
+        bannerText.addView(text("Добро пожаловать в Stargram! ⭐",16,fg));
+        bannerText.addView(text("Общайтесь и находите новых друзей.",13,muted));
+        banner.addView(bannerText,new LinearLayout.LayoutParams(0,-2,1));
 
-        for (int i=0;i<storyNames.length;i++) {
-            LinearLayout item = column();
-            item.setGravity(Gravity.CENTER);
-            TextView circle = text(storyIcons[i],25,Color.WHITE);
-            circle.setGravity(Gravity.CENTER);
-            circle.setBackground(shape(i==0 ? muted : blue,50));
-            item.addView(circle,new LinearLayout.LayoutParams(dp(54),dp(54)));
-            TextView label = text(storyNames[i],11,muted);
-            label.setGravity(Gravity.CENTER);
-            item.addView(label);
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(76),-2);
-            stories.addView(item,ip);
-        }
-        hs.addView(stories);
-        content.addView(hs);
+        TextView close = text("×",25,muted);
+        banner.addView(close);
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1,-2);
+        bp.setMargins(dp(16),0,dp(16),dp(14));
+        content.addView(banner,bp);
+        close.setOnClickListener(v -> content.removeView(banner));
+
+        LinearLayout archive = row();
+        archive.setPadding(dp(16),dp(12),dp(16),dp(12));
+
+        TextView archiveIcon = text("▣",28,Color.WHITE);
+        archiveIcon.setGravity(Gravity.CENTER);
+        archiveIcon.setBackground(shape(Color.rgb(56,83,105),50));
+        archive.addView(archiveIcon,new LinearLayout.LayoutParams(dp(58),dp(58)));
+
+        LinearLayout archiveInfo = column();
+        archiveInfo.setPadding(dp(14),0,0,0);
+        TextView archiveTitle = text("Архив чатов",17,fg);
+        archiveTitle.setTypeface(null,Typeface.BOLD);
+        archiveInfo.addView(archiveTitle);
+        archiveInfo.addView(text("Сохранённые переписки",14,muted));
+        archive.addView(archiveInfo);
+        content.addView(archive);
+        archive.setOnClickListener(v -> toast("Архив пока пуст"));
 
         heading("Все чаты");
+
+        ArrayList<View> chatRows = new ArrayList<>();
 
         for (int i=0;i<names.length;i++) {
             final int index=i;
             LinearLayout item = row();
-            item.setPadding(dp(15),dp(10),dp(15),dp(10));
+            item.setPadding(dp(16),dp(11),dp(16),dp(11));
 
             TextView avatar = text(avatars[i],25,Color.WHITE);
             avatar.setGravity(Gravity.CENTER);
-            avatar.setBackground(shape(new int[]{
-                Color.rgb(67,145,225),Color.rgb(219,112,147),
-                Color.rgb(80,170,130),Color.rgb(125,105,210),
-                blue}[i],50));
-            item.addView(avatar,new LinearLayout.LayoutParams(dp(54),dp(54)));
+            int[] avatarColors = {
+                Color.rgb(67,145,225),
+                Color.rgb(219,112,147),
+                Color.rgb(80,170,130),
+                Color.rgb(125,105,210),
+                blue
+            };
+            avatar.setBackground(shape(avatarColors[i],50));
+            item.addView(avatar,new LinearLayout.LayoutParams(dp(58),dp(58)));
 
             LinearLayout info = column();
             info.setPadding(dp(13),0,0,0);
-            TextView name = text(names[i],16,fg);
+
+            TextView name = text(names[i],17,fg);
             name.setTypeface(null,Typeface.BOLD);
             info.addView(name);
-            info.addView(text(messages[i],14,muted));
-            item.addView(info,new LinearLayout.LayoutParams(0,-2,1));
 
-            TextView time = text(times[i],11,muted);
+            TextView message = text(messages[i],14,muted);
+            info.addView(message);
+
+            item.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+            TextView time = text(times[i],12,muted);
             item.addView(time);
+
             content.addView(item);
-            View divider = new View(this);
-            divider.setBackgroundColor(line);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,dp(1));
-            lp.setMargins(dp(82),0,0,0);
-            content.addView(divider,lp);
+            chatRows.add(item);
 
             item.setOnClickListener(v -> {
                 selectedChat=names[index];
                 showPage("Чат");
             });
         }
+
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s,int st,int c,int a) {}
             public void onTextChanged(CharSequence s,int st,int before,int count) {
                 String q=s.toString().toLowerCase();
-                for(int i=0;i<names.length;i++) {
-                    // Поиск будет расширен при подключении списка контактов.
+                for(int i=0;i<chatRows.size();i++) {
+                    boolean match = names[i].toLowerCase().contains(q)
+                        || messages[i].toLowerCase().contains(q);
+                    chatRows.get(i).setVisibility(match ? View.VISIBLE : View.GONE);
                 }
             }
             public void afterTextChanged(Editable e) {}
@@ -240,24 +253,34 @@ public class MainActivity extends Activity {
 
     void bottomBar() {
         LinearLayout bar = row();
-        bar.setBackgroundColor(card);
-        bar.setPadding(0,dp(7),0,dp(7));
-        String[] tabs={"Контакты","Звонки","Чаты","Настройки"};
-        String[] icons={"♙","☎","▤","⚙"};
+        bar.setBackground(shape(card,28));
+        bar.setElevation(dp(8));
+        bar.setPadding(dp(3),dp(7),dp(3),dp(7));
+
+        String[] tabs={"Чаты","Контакты","Настройки","Профиль"};
+        String[] icons={"●","♙","⚙","●"};
+
         for(int i=0;i<tabs.length;i++) {
             final String tab=tabs[i];
             LinearLayout item=column();
             item.setGravity(Gravity.CENTER);
+
             int color=page.equals(tab)?blue:muted;
-            TextView ic=text(icons[i],21,color);
+            TextView ic=text(icons[i],23,color);
             ic.setGravity(Gravity.CENTER);
             item.addView(ic);
+
             TextView label=text(tab,11,color);
+            label.setTypeface(null,Typeface.BOLD);
             item.addView(label);
-            bar.addView(item,new LinearLayout.LayoutParams(0,dp(48),1));
+
+            bar.addView(item,new LinearLayout.LayoutParams(0,dp(50),1));
             item.setOnClickListener(v -> showPage(tab));
         }
-        root.addView(bar);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(dp(12),dp(5),dp(12),dp(8));
+        root.addView(bar,lp);
     }
 
     void contacts() {
