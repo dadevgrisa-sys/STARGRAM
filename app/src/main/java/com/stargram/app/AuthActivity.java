@@ -3,74 +3,124 @@ package com.stargram.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
 import android.view.Gravity;
-import android.view.View;
-import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
-import android.text.InputFilter;
-import android.text.InputType;
+import android.view.View;
+import android.view.WindowManager;
 import android.widget.*;
+
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class AuthActivity extends Activity {
 
     private final int bg = Color.rgb(24, 24, 24);
     private final int white = Color.WHITE;
-    private final int gray = Color.rgb(145, 145, 145);
+    private final int gray = Color.rgb(155, 155, 155);
     private final int blue = Color.rgb(82, 115, 245);
-    private final int outline = Color.rgb(75, 75, 75);
+
+    private final String API = "http://127.0.0.1:5000";
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private String selectedCode = "+7";
-    private TextView country;
-    private TextView prefix;
-    private EditText numberInput;
+    private String currentNumber = "";
 
-    private CheckBox syncContacts;
-    private CheckBox testServer;
-    private CheckBox compatibility;
+    private EditText numberInput;
+    private EditText codeInput;
+    private TextView country;
+    private TextView status;
+    private TextView timerText;
+    private Button continueButton;
+
+    private CountDownTimer timer;
+    private boolean verifyInProgress = false;
+    private boolean requestInProgress = false;
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private GradientDrawable shape(int color, int strokeColor, int radius) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(dp(radius));
-        if (strokeColor != 0) {
-            drawable.setStroke(dp(1), strokeColor);
+    private GradientDrawable shape(int color, int stroke, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radius));
+        if (stroke != 0) d.setStroke(dp(1), stroke);
+        return d;
+    }
+
+    private TextView text(String value, int size, int color) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        return t;
+    }
+
+    private void hideKeyboard(View view) {
+        InputMethodManager imm = (InputMethodManager)
+            getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+    }
+
+    private JSONObject post(String path, JSONObject data) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection)
+            new URL(API + path).openConnection();
+
+        connection.setRequestMethod("POST");
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(15000);
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+
+        byte[] bytes = data.toString().getBytes(StandardCharsets.UTF_8);
+
+        try (OutputStream out = connection.getOutputStream()) {
+            out.write(bytes);
         }
-        return drawable;
-    }
 
-    private TextView makeText(String value, int size, int color) {
-        TextView text = new TextView(this);
-        text.setText(value);
-        text.setTextSize(size);
-        text.setTextColor(color);
-        return text;
-    }
+        int responseCode = connection.getResponseCode();
+        InputStream stream = responseCode >= 200 && responseCode < 300
+            ? connection.getInputStream() : connection.getErrorStream();
 
-    private CheckBox makeCheckBox(String value) {
-        CheckBox check = new CheckBox(this);
-        check.setText(value);
-        check.setTextSize(16);
-        check.setTextColor(white);
-        check.setGravity(Gravity.CENTER_VERTICAL);
-        check.setButtonTintList(new ColorStateList(
-            new int[][] {
-                new int[] { android.R.attr.state_checked },
-                new int[] {}
-            },
-            new int[] { blue, Color.rgb(110, 110, 120) }
-        ));
-        check.setPadding(dp(2), 0, 0, 0);
-        return check;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+        if (stream != null) {
+            try (InputStream in = stream) {
+                byte[] chunk = new byte[1024];
+                int n;
+                while ((n = in.read(chunk)) != -1) {
+                    buffer.write(chunk, 0, n);
+                }
+            }
+        }
+
+        connection.disconnect();
+
+        String body = buffer.toString("UTF-8");
+        JSONObject result = body.isEmpty() ? new JSONObject() : new JSONObject(body);
+
+        if (responseCode < 200 || responseCode >= 300) {
+            throw new Exception(result.optString("error", "Ошибка сервера"));
+        }
+
+        return result;
     }
 
     @Override
@@ -79,278 +129,334 @@ public class AuthActivity extends Activity {
 
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
-        getWindow().getDecorView().setSystemUiVisibility(0);
         getWindow().setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         );
 
-        showScreen();
+        showPhoneScreen();
     }
 
-    private void showScreen() {
-        LinearLayout screen = new LinearLayout(this);
-        screen.setOrientation(LinearLayout.VERTICAL);
-        screen.setBackgroundColor(bg);
-        screen.setPadding(dp(20), dp(5), dp(20), dp(8));
+    private LinearLayout createScreen() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setBackgroundColor(bg);
+        root.setPadding(dp(24), dp(24), dp(24), dp(20));
+        return root;
+    }
 
-        // Верхняя панель
-        LinearLayout toolbar = new LinearLayout(this);
-        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+    private void showPhoneScreen() {
+        LinearLayout root = createScreen();
 
-        TextView back = makeText("←", 27, white);
-        back.setGravity(Gravity.CENTER);
-        toolbar.addView(back, new LinearLayout.LayoutParams(dp(45), dp(48)));
+        TextView logo = text("✦ STARGRAM", 25, white);
+        logo.setTypeface(null, Typeface.BOLD);
+        logo.setGravity(Gravity.CENTER);
+        root.addView(logo, new LinearLayout.LayoutParams(-1, dp(75)));
 
-        View spacer = new View(this);
-        toolbar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
-
-        TextView menu = makeText("⋮", 27, white);
-        menu.setGravity(Gravity.CENTER);
-        toolbar.addView(menu, new LinearLayout.LayoutParams(dp(35), dp(48)));
-
-        screen.addView(toolbar);
-
-        back.setOnClickListener(v -> finish());
-
-        menu.setOnClickListener(v -> {
-            PopupMenu popup = new PopupMenu(this, menu);
-            popup.getMenu().add("О STARGRAM");
-            popup.getMenu().add("Помощь");
-            popup.setOnMenuItemClickListener(item -> {
-                new AlertDialog.Builder(this)
-                    .setTitle("STARGRAM")
-                    .setMessage("Мессенджер STARGRAM")
-                    .setPositiveButton("OK", null)
-                    .show();
-                return true;
-            });
-            popup.show();
-        });
-
-        // Основное содержимое
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(18), dp(10), dp(18), 0);
-
-        TextView title = makeText("Номер телефона", 22, white);
+        TextView title = text("Номер телефона", 23, white);
         title.setTypeface(null, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
+        root.addView(title);
 
-        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView subtitle = makeText(
-            "Проверьте код страны и введите свой\nномер телефона.",
-            15,
-            gray
+        TextView subtitle = text(
+            "Выберите код страны и введите номер,\nпривязанный к вашему аккаунту STARGRAM.",
+            15, gray
         );
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setLineSpacing(dp(2), 1f);
+        subtitle.setLineSpacing(dp(4), 1f);
 
-        LinearLayout.LayoutParams subtitleParams =
+        LinearLayout.LayoutParams subParams =
             new LinearLayout.LayoutParams(-1, -2);
-        subtitleParams.setMargins(0, dp(12), 0, dp(27));
-        content.addView(subtitle, subtitleParams);
+        subParams.setMargins(0, dp(12), 0, dp(30));
+        root.addView(subtitle, subParams);
 
-        // Выбор страны
-        LinearLayout countryBox = new LinearLayout(this);
-        countryBox.setGravity(Gravity.CENTER_VERTICAL);
-        countryBox.setPadding(dp(16), 0, dp(12), 0);
-        countryBox.setBackground(shape(bg, outline, 9));
+        country = text("Россия (+7)                         ⌄", 16, white);
+        country.setGravity(Gravity.CENTER_VERTICAL);
+        country.setPadding(dp(16), 0, dp(12), 0);
+        country.setBackground(shape(Color.rgb(35, 35, 35), 0, 10));
 
-        country = makeText("Россия", 16, white);
-        countryBox.addView(country,
-            new LinearLayout.LayoutParams(0, dp(54), 1));
+        root.addView(country,
+            new LinearLayout.LayoutParams(-1, dp(54)));
 
-        TextView countryArrow = makeText("⌄", 24, gray);
-        countryArrow.setGravity(Gravity.CENTER);
-        countryBox.addView(countryArrow,
-            new LinearLayout.LayoutParams(dp(30), dp(54)));
-
-        content.addView(countryBox,
-            new LinearLayout.LayoutParams(-1, dp(56)));
-
-        countryBox.setOnClickListener(v -> {
+        country.setOnClickListener(v -> {
             String[] options = {
                 "Россия (+7)",
                 "Пользовательский номер (+888)"
             };
 
             new AlertDialog.Builder(this)
-                .setTitle("Страна")
+                .setTitle("Выберите код")
                 .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        selectedCode = "+7";
-                        country.setText("Россия");
-                    } else {
-                        selectedCode = "+888";
-                        country.setText("Пользовательский номер");
-                    }
-
-                    prefix.setText(selectedCode);
+                    selectedCode = which == 0 ? "+7" : "+888";
+                    country.setText(
+                        which == 0
+                            ? "Россия (+7)                         ⌄"
+                            : "Пользовательский номер (+888)       ⌄"
+                    );
                     numberInput.setText("");
-
-                    int required = selectedCode.equals("+7") ? 10 : 8;
-                    numberInput.setFilters(new InputFilter[] {
-                        new InputFilter.LengthFilter(required)
-                    });
-
                     numberInput.setHint(
-                        selectedCode.equals("+7")
-                            ? "000 000 0000"
-                            : "0000 0000"
+                        which == 0 ? "900 000 0000" : "Введите 3, 6 или 10 цифр"
                     );
                 })
                 .show();
         });
 
-        // Поле номера телефона
-        FrameLayout phoneField = new FrameLayout(this);
-        phoneField.setClipChildren(false);
-        phoneField.setClipToPadding(false);
-        phoneField.setBackground(shape(bg, Color.rgb(135, 150, 255), 10));
-
-        LinearLayout phoneRow = new LinearLayout(this);
-        phoneRow.setGravity(Gravity.CENTER_VERTICAL);
-        phoneRow.setPadding(dp(12), 0, dp(12), 0);
-
-        prefix = makeText("+7", 18, white);
-        prefix.setGravity(Gravity.CENTER);
-        phoneRow.addView(prefix,
-            new LinearLayout.LayoutParams(dp(48), -1));
-
-        View divider = new View(this);
-        divider.setBackgroundColor(outline);
-        phoneRow.addView(divider,
-            new LinearLayout.LayoutParams(dp(1), dp(27)));
-
         numberInput = new EditText(this);
         numberInput.setSingleLine(true);
         numberInput.setTextSize(18);
         numberInput.setTextColor(white);
-        numberInput.setHint("000 000 0000");
         numberInput.setHintTextColor(gray);
-        numberInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        numberInput.setBackgroundColor(Color.TRANSPARENT);
-        numberInput.setPadding(dp(12), 0, 0, 0);
+        numberInput.setHint("900 000 0000");
+        numberInput.setInputType(2);
+        numberInput.setPadding(dp(16), 0, dp(16), 0);
+        numberInput.setBackground(shape(Color.rgb(35, 35, 35), blue, 10));
         numberInput.setFilters(new InputFilter[] {
             new InputFilter.LengthFilter(10)
         });
-        numberInput.setSelectAllOnFocus(false);
 
-        phoneRow.addView(numberInput,
-            new LinearLayout.LayoutParams(0, -1, 1));
-
-        phoneField.addView(phoneRow,
-            new FrameLayout.LayoutParams(-1, -1));
-
-        TextView phoneLabel = makeText(
-            "Номер телефона", 12, Color.rgb(160, 170, 255)
-        );
-        phoneLabel.setBackgroundColor(bg);
-        phoneLabel.setPadding(dp(6), 0, dp(6), 0);
-
-        FrameLayout.LayoutParams labelParams =
-            new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
-        labelParams.leftMargin = dp(15);
-        labelParams.topMargin = -dp(8);
-        phoneField.addView(phoneLabel, labelParams);
-
-        LinearLayout.LayoutParams phoneParams =
+        LinearLayout.LayoutParams inputParams =
             new LinearLayout.LayoutParams(-1, dp(58));
-        phoneParams.setMargins(0, dp(22), 0, dp(15));
-        content.addView(phoneField, phoneParams);
+        inputParams.setMargins(0, dp(18), 0, dp(12));
+        root.addView(numberInput, inputParams);
 
-        // Переключатели
-        syncContacts = makeCheckBox("Синхронизировать контакты");
-        testServer = makeCheckBox("Тестовый сервер");
-        compatibility = makeCheckBox("Режим совместимости");
-
-        content.addView(syncContacts,
-            new LinearLayout.LayoutParams(-1, dp(48)));
-
-        content.addView(testServer,
-            new LinearLayout.LayoutParams(-1, dp(48)));
-
-        LinearLayout compatibilityRow = new LinearLayout(this);
-        compatibilityRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        compatibilityRow.addView(compatibility,
-            new LinearLayout.LayoutParams(0, dp(48), 1));
-
-        TextView question = makeText("ⓘ", 19, gray);
-        question.setGravity(Gravity.CENTER);
-        compatibilityRow.addView(question,
-            new LinearLayout.LayoutParams(dp(35), dp(45)));
-
-        question.setOnClickListener(v ->
-            new AlertDialog.Builder(this)
-                .setTitle("Режим совместимости")
-                .setMessage("Дополнительный режим совместимости приложения.")
-                .setPositiveButton("Понятно", null)
-                .show()
+        TextView hint = text(
+            "+7: 10 цифр, начиная с 900.\n+888: допускается 3, 6 или 10 цифр.",
+            13, gray
         );
+        root.addView(hint);
 
-        content.addView(compatibilityRow);
+        status = text("", 14, Color.rgb(255, 110, 110));
+        status.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams statusParams =
+            new LinearLayout.LayoutParams(-1, -2);
+        statusParams.setMargins(0, dp(12), 0, dp(8));
+        root.addView(status, statusParams);
 
-        // Кнопка продолжения
-        FrameLayout button = new FrameLayout(this);
-        button.setBackground(shape(blue, 0, 15));
-
-        TextView arrow = makeText("→", 29, white);
-        arrow.setGravity(Gravity.CENTER);
-        button.addView(arrow,
-            new FrameLayout.LayoutParams(-1, -1));
+        continueButton = new Button(this);
+        continueButton.setText("Продолжить");
+        continueButton.setTextColor(white);
+        continueButton.setAllCaps(false);
+        continueButton.setTextSize(16);
+        continueButton.setBackgroundTintList(
+            android.content.res.ColorStateList.valueOf(blue)
+        );
 
         LinearLayout.LayoutParams buttonParams =
-            new LinearLayout.LayoutParams(dp(56), dp(56));
-        buttonParams.gravity = Gravity.RIGHT;
-        buttonParams.setMargins(0, dp(8), 0, dp(12));
-        content.addView(button, buttonParams);
+            new LinearLayout.LayoutParams(-1, dp(52));
+        buttonParams.setMargins(0, dp(12), 0, 0);
+        root.addView(continueButton, buttonParams);
 
-        button.setOnClickListener(v -> {
-            String number = numberInput.getText().toString();
+        continueButton.setOnClickListener(v -> requestCode());
 
-            if (number.equals("20261107")) {
-                startActivity(new Intent(AuthActivity.this, MainActivity.class));
-                finish();
-                return;
+        setContentView(root);
+    }
+
+    private void requestCode() {
+        if (requestInProgress) return;
+
+        String digits = numberInput.getText().toString().trim();
+
+        boolean valid;
+        if (selectedCode.equals("+7")) {
+            valid = digits.length() == 10 && digits.startsWith("900");
+        } else {
+            valid = digits.length() == 10 ||
+                    digits.length() == 6 ||
+                    digits.length() == 3;
+        }
+
+        if (!valid) {
+            status.setText("Проверьте номер телефона.");
+            return;
+        }
+
+        currentNumber = selectedCode + digits;
+        requestInProgress = true;
+        continueButton.setEnabled(false);
+        status.setText("Отправляем запрос...");
+
+        hideKeyboard(numberInput);
+
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("number", currentNumber);
+
+                post("/auth/request", data);
+
+                runOnUiThread(() -> {
+                    requestInProgress = false;
+                    showCodeScreen();
+                });
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    requestInProgress = false;
+                    continueButton.setEnabled(true);
+                    status.setText(e.getMessage());
+                });
             }
+        });
+    }
 
-            int required = selectedCode.equals("+7") ? 10 : 8;
+    private void showCodeScreen() {
+        LinearLayout root = createScreen();
 
-            if (number.length() != required) {
-                Toast.makeText(
-                    this,
-                    "Проверьте введённый номер",
-                    Toast.LENGTH_SHORT
-                ).show();
-                return;
-            }
+        TextView logo = text("✦ STARGRAM", 25, white);
+        logo.setTypeface(null, Typeface.BOLD);
+        logo.setGravity(Gravity.CENTER);
+        root.addView(logo, new LinearLayout.LayoutParams(-1, dp(75)));
 
-            new AlertDialog.Builder(this)
-                .setTitle("STARGRAM")
-                .setMessage("Подтверждение номера будет добавлено следующим этапом.")
-                .setPositiveButton("Понятно", null)
-                .show();
+        TextView title = text("Код подтверждения", 23, white);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title);
+
+        TextView subtitle = text(
+            "Если номер зарегистрирован, код отправлен\nв Telegram, привязанный к аккаунту.",
+            15, gray
+        );
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setLineSpacing(dp(4), 1f);
+
+        LinearLayout.LayoutParams subParams =
+            new LinearLayout.LayoutParams(-1, -2);
+        subParams.setMargins(0, dp(14), 0, dp(25));
+        root.addView(subtitle, subParams);
+
+        TextView number = text(currentNumber, 17, white);
+        number.setGravity(Gravity.CENTER);
+        root.addView(number);
+
+        codeInput = new EditText(this);
+        codeInput.setSingleLine(true);
+        codeInput.setGravity(Gravity.CENTER);
+        codeInput.setTextSize(25);
+        codeInput.setTextColor(white);
+        codeInput.setHintTextColor(gray);
+        codeInput.setHint("·  ·  ·  ·  ·  ·");
+        codeInput.setInputType(2);
+        codeInput.setLetterSpacing(0.25f);
+        codeInput.setFilters(new InputFilter[] {
+            new InputFilter.LengthFilter(6)
+        });
+        codeInput.setBackground(shape(Color.rgb(35, 35, 35), blue, 10));
+
+        LinearLayout.LayoutParams codeParams =
+            new LinearLayout.LayoutParams(-1, dp(62));
+        codeParams.setMargins(0, dp(28), 0, dp(12));
+        root.addView(codeInput, codeParams);
+
+        status = text("", 14, Color.rgb(255, 110, 110));
+        status.setGravity(Gravity.CENTER);
+        root.addView(status, new LinearLayout.LayoutParams(-1, dp(35)));
+
+        timerText = text("Код действителен 05:00", 14, gray);
+        timerText.setGravity(Gravity.CENTER);
+        root.addView(timerText);
+
+        TextView change = text("Изменить номер телефона", 15, blue);
+        change.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams changeParams =
+            new LinearLayout.LayoutParams(-1, dp(55));
+        changeParams.setMargins(0, dp(20), 0, 0);
+        root.addView(change, changeParams);
+
+        change.setOnClickListener(v -> {
+            if (timer != null) timer.cancel();
+            verifyInProgress = false;
+            showPhoneScreen();
         });
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(bg);
-        scroll.setClipToPadding(false);
-        scroll.addView(content);
+        setContentView(root);
 
-        screen.addView(scroll,
-            new LinearLayout.LayoutParams(-1, 0, 1));
+        timer = new CountDownTimer(300000, 1000) {
+            @Override
+            public void onTick(long millis) {
+                long seconds = millis / 1000;
+                timerText.setText(String.format(
+                    "Код действителен %02d:%02d",
+                    seconds / 60, seconds % 60
+                ));
+            }
 
-        setContentView(screen);
+            @Override
+            public void onFinish() {
+                timerText.setText("Время действия кода истекло");
+            }
+        }.start();
 
-        // Автоматически открываем цифровую клавиатуру
-        numberInput.requestFocus();
-        numberInput.post(() -> {
-            InputMethodManager keyboard =
-                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            keyboard.showSoftInput(numberInput, InputMethodManager.SHOW_IMPLICIT);
+        codeInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(
+                CharSequence s, int start, int count, int after) {}
+
+            @Override public void onTextChanged(
+                CharSequence s, int start, int before, int count) {
+                if (s.length() == 6 && !verifyInProgress) {
+                    verifyCode(s.toString());
+                }
+            }
+
+            @Override public void afterTextChanged(Editable s) {}
         });
+
+        codeInput.requestFocus();
+        codeInput.post(() -> {
+            InputMethodManager imm = (InputMethodManager)
+                getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(codeInput, InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+    }
+
+    private void verifyCode(String code) {
+        if (verifyInProgress) return;
+
+        verifyInProgress = true;
+        status.setText("Проверяем код...");
+        hideKeyboard(codeInput);
+
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("number", currentNumber);
+                data.put("code", code);
+
+                JSONObject result = post("/auth/verify", data);
+                String token = result.getString("session_token");
+                String accountId = result.optString("account_id", "");
+
+                getSharedPreferences("stargram_session", MODE_PRIVATE)
+                    .edit()
+                    .putString("session_token", token)
+                    .putString("account_id", accountId)
+                    .apply();
+
+                runOnUiThread(() -> {
+                    if (timer != null) timer.cancel();
+
+                    startActivity(new Intent(
+                        AuthActivity.this, MainActivity.class
+                    ));
+                    finish();
+                });
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    verifyInProgress = false;
+                    status.setText(e.getMessage());
+                    codeInput.setText("");
+                    codeInput.requestFocus();
+                });
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (timer != null) timer.cancel();
+        executor.shutdownNow();
+        super.onDestroy();
     }
 }
